@@ -1,0 +1,41 @@
+# EvalSentry starter suite. Runs offline with the `mock` provider; swap in a real provider when ready.
+description: Starter suite — a capital-cities assistant
+
+providers:
+  - id: mock
+    type: mock
+    responses:
+      - match: "Nigeria"
+        output: "The capital of Nigeria is Abuja."
+      - match: "Ghana"
+        output: "Accra is the capital of Ghana."
+    default_output: "I am not sure."
+  # Real model (set ANTHROPIC_API_KEY first):
+  # - id: claude
+  #   type: anthropic
+  #   model: claude-sonnet-5-5
+  #   api_key_env: ANTHROPIC_API_KEY
+  #   price: { input: 3.0, output: 15.0 }   # USD per million tokens — check your provider's price list
+
+prompts:
+  - id: v1
+    system: "Answer in one short sentence."
+    user: "What is the capital of {{ country }}?"
+
+tests:
+  - description: Nigeria
+    vars: { country: Nigeria, capital: Abuja }
+  - description: Ghana
+    vars: { country: Ghana, capital: Accra }
+  - description: Kenya
+    vars: { country: Kenya, capital: Nairobi }
+
+defaults:
+  assert:
+    - type: contains
+      value: "{{ capital }}"
+    - type: length
+      max_words: 25
+
+gate:
+  min_pass_rate: 0.9

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EvalSentry · {{ run.suite }}</title>
+<style>
+:root { --bg:#f6f7f9; --card:#fff; --ink:#151a23; --muted:#5f6878; --line:#e3e6ec; --pass:#13795b; --pass-bg:#e3f5ee; --fail:#c0362c; --fail-bg:#fde9e7;
+  --warn:#9a6200; --warn-bg:#fdf3dd; --accent:#4b3fd1; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0f1218; --card:#171b23; --ink:#e7eaf0; --muted:#9aa3b2; --line:#2a303b; --pass:#4fd1a1; --pass-bg:#11291f;
+  --fail:#ff8a80; --fail-bg:#33181a; --warn:#f0c060; --warn-bg:#2e2510; --accent:#9d95ff; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+h1 { font-size: 1.6rem; margin: 0; } h2 { font-size: 1.1rem; margin: 28px 0 10px; }
+.muted { color: var(--muted); } .mono { font-family: var(--mono); font-size: .9em; }
+.head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.badge { display: inline-flex; gap: 8px; align-items: center; font-weight: 700; padding: 6px 14px; border-radius: 99px; }
+.badge.ok { background: var(--pass-bg); color: var(--pass); } .badge.bad { background: var(--fail-bg); color: var(--fail); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.kpi b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; } .kpi span { color: var(--muted); font-size: .85rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cell { display: inline-block; min-width: 64px; text-align: center; padding: 3px 8px; border-radius: 7px; font-weight: 700; text-decoration: none; font-variant-numeric: tabular-nums; }
+.cell.pass { background: var(--pass-bg); color: var(--pass); } .cell.fail { background: var(--fail-bg); color: var(--fail); }
+.cell.flaky { background: var(--warn-bg); color: var(--warn); } .cell.reg { outline: 2px solid var(--fail); }
+.gate li { margin: 4px 0; } .gate { padding-left: 18px; }
+.case { border: 1px solid var(--line); border-left: 4px solid var(--fail); border-radius: 10px; background: var(--card); margin: 10px 0; }
+.case.pass { border-left-color: var(--pass); }
+.case summary { cursor: pointer; padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.case .body { padding: 0 14px 14px; display: grid; gap: 10px; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12.5px/1.5 var(--mono); max-height: 320px; overflow: auto; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.a { display: flex; gap: 8px; font-size: .9rem; } .a .t { font-family: var(--mono); font-weight: 600; min-width: 90px; }
+.a.ok .mark { color: var(--pass); } .a.no .mark { color: var(--fail); }
+.toolbar { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+.tag { font-size: .75rem; padding: 1px 8px; border-radius: 99px; background: var(--line); color: var(--muted); }
+footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+<div class="head">
+  <div>
+    <p class="muted">EvalSentry report · {{ run.started_at }} · {{ "%.1f"|format(run.duration_s) }} s</p>
+    <h1>{{ run.suite }}</h1>
+    {% if run.description %}<p class="muted">{{ run.description }}</p>{% endif %}
+  </div>
+  <span class="badge {{ 'ok' if gate.passed else 'bad' }}">{{ '✓ Quality gate passed' if gate.passed else '✕ Quality gate failed' }}</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><b>{{ run.pass_rate|pct }}</b><span>Pass rate</span></div>
+  <div class="kpi"><b>{{ run.results|length }}</b><span>Model calls</span></div>
+  <div class="kpi"><b>{{ run.total_cost|money }}</b><span>Cost (uncached calls)</span></div>
+  <div class="kpi"><b>{{ "%.0f"|format(run.p95_latency_ms) }} ms</b><span>p95 latency</span></div>
+  {% if comparison %}<div class="kpi"><b>{{ comparison.regressions|length }}</b><span>Regressions vs baseline</span></div>{% endif %}
+</div>
+
+{% if gate.checks %}
+<h2>Quality gate</h2>
+<ul class="gate">{% for name, ok, detail in gate.checks %}<li>{{ '✅' if ok else '❌' }} <span class="mono">{{ name }}</span> — {{ detail }}</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>By prompt and provider</h2>
+<div class="card"><table>
+<thead><tr><th>Prompt</th><th>Provider</th><th class="num">Passed</th><th class="num">Pass rate</th><th class="num">Mean score</th><th class="num">p50 / p95 ms</th><th class="num">Tokens in / out</th><th class="num">Cost</th><th>Flaky</th></tr></thead>
+<tbody>{% for g in groups %}<tr>
+<td class="mono">{{ g.prompt_id }}</td><td class="mono">{{ g.provider_id }}</td><td class="num">{{ g.passed }}/{{ g.cases }}</td>
+<td class="num"><b>{{ g.pass_rate|pct }}</b></td><td class="num">{{ "%.2f"|format(g.mean_score) }}</td>
+<td class="num">{{ "%.0f"|format(g.p50_latency_ms) }} / {{ "%.0f"|format(g.p95_latency_ms) }}</td>
+<td class="num">{{ g.input_tokens }} / {{ g.output_tokens }}</td><td class="num">{{ g.cost_usd|money }}</td>
+<td>{{ g.flaky|join(', ') }}</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% if comparison %}
+<h2>Compared with baseline</h2>
+<p>Pass rate {{ comparison.pass_rate_before|pct }} → <b>{{ comparison.pass_rate_after|pct }}</b> · cost {{ comparison.cost_before|money }} → {{ comparison.cost_after|money }}</p>
+{% if comparison.regressions %}<p><b>Regressions:</b> {% for c in comparison.regressions %}<span class="mono">{{ c.test_id }}</span> ({{ c.prompt_id }} · {{ c.provider_id }}){{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+{% if comparison.fixes %}<p><b>Fixed:</b> {% for c in comparison.fixes %}<span class="mono">{{ c.test_id }}</span>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+{% if comparison.score_drops %}<p><b>Still passing but scoring lower:</b> {% for c in comparison.score_drops %}<span class="mono">{{ c.test_id }}</span> ({{ c.before }} → {{ c.after }}){{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+{% endif %}
+
+<h2>Test matrix</h2>
+<div class="card"><table>
+<thead><tr><th>Test</th>{% for p, m in columns %}<th class="num">{{ p }}<br><span class="mono">{{ m }}</span></th>{% endfor %}</tr></thead>
+<tbody>{% for t in tests %}<tr><td class="mono">{{ t }}</td>
+{% for p, m in columns %}{% set rs = cell.get((t, p, m), []) %}<td class="num">{% if rs %}
+{% set npass = rs|selectattr('passed')|list|length %}
+<a href="#c-{{ t }}-{{ p }}-{{ m }}" class="cell {{ 'pass' if npass == rs|length else ('flaky' if npass else 'fail') }} {{ 'reg' if (t ~ '|' ~ p ~ '|' ~ m) in regressed }}"
+ title="{{ npass }}/{{ rs|length }} repeats passed">{{ "%.2f"|format(rs|map(attribute='score')|sum / rs|length) }}{% if rs|length > 1 %} · {{ npass }}/{{ rs|length }}{% endif %}</a>
+{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Cases</h2>
+<div class="toolbar"><label><input type="checkbox" id="onlyfail" checked> Show failures only</label><span class="muted">{{ failures|length }} failing of {{ run.results|length }}</span></div>
+<div id="cases">
+{% for r in run.results %}
+<details class="case {{ 'pass' if r.passed else 'fail' }}" id="c-{{ r.test_id }}-{{ r.prompt_id }}-{{ r.provider_id }}{% if r.repeat %}-{{ r.repeat }}{% endif %}">
+<summary><b class="mono">{{ r.test_id }}</b><span class="tag">{{ r.prompt_id }}</span><span class="tag">{{ r.provider_id }}</span>{% if r.repeat %}<span class="tag">repeat {{ r.repeat + 1 }}</span>{% endif %}
+<span>{{ '✓' if r.passed else '✕' }} score {{ "%.2f"|format(r.score) }}</span>{% if r.cached %}<span class="tag">cached</span>{% endif %}
+<span class="muted">{{ "%.0f"|format(r.latency_ms) }} ms</span>{% if r.description %}<span class="muted">— {{ r.description }}</span>{% endif %}</summary>
+<div class="body">
+{% if r.error %}<pre>{{ r.error }}</pre>{% endif %}
+<div>{% for a in r.assertions %}<div class="a {{ 'ok' if a.passed else 'no' }}"><span class="mark">{{ '✓' if a.passed else '✕' }}</span><span class="t">{{ a.type }}</span><span>{{ a.reason }}</span></div>{% endfor %}</div>
+<div class="grid2"><div><p class="muted">Prompt</p><pre>{{ r.prompt }}</pre></div><div><p class="muted">Output{% if r.model %} · {{ r.model }}{% endif %}</p><pre>{{ r.output }}</pre></div></div>
+</div>
+</details>
+{% endfor %}
+</div>
+<footer>Generated by EvalSentry {{ run.tool_version }}. This file is self-contained and can be attached to a pull request or archived as a CI artifact.</footer>
+</main>
+<script>
+(function () {
+  var box = document.getElementById('onlyfail');
+  function apply() { document.querySelectorAll('.case.pass').forEach(function (c) { c.style.display = box.checked ? 'none' : ''; }); }
+  box.addEventListener('change', apply); apply();
+  if (location.hash) { var el = document.querySelector(location.hash); if (el) { el.style.display = ''; el.open = true; } }
+  document.querySelectorAll('a.cell').forEach(function (a) { a.addEventListener('click', function () {
+    var el = document.getElementById(a.getAttribute('href').slice(1)); if (el) { el.style.display = ''; el.open = true; } }); });
+})();
+</script>
+</body>
+</html>
