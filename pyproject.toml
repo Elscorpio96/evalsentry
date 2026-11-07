@@ -1,0 +1,62 @@
+[project]
+name = "evalsentry"
+version = "0.1.0"
+description = "Regression tests and CI quality gates for LLM apps: prompts, models and agents."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Walid Bello Yakubu" }]
+requires-python = ">=3.11"
+keywords = ["llm", "evaluation", "evals", "testing", "ci", "llm-as-judge", "prompt-engineering", "ai-engineering"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "pyyaml>=6",
+  "jsonschema>=4.20",
+  "jinja2>=3.1",
+  "rich>=13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "respx>=0.21", "ruff>=0.6", "mypy>=1.10", "types-PyYAML", "types-jsonschema"]
+
+[project.scripts]
+evalsentry = "evalsentry.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Elscorpio96/evalsentry"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["evalsentry"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 152
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF"]
+ignore = ["S101", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S108", "RUF043"]
+"examples/*" = ["S"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
