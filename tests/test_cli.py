@@ -32,10 +32,10 @@ def test_run_writes_reports_and_github_summary(tmp_path, monkeypatch):
     code = main(["run", "-c", SUPPORT, "--prompt", "v2", "--no-cache", "-q", "-o", str(out), "--html", str(page), "--md", str(md),
                  "--github"])
     assert code == 0
-    data = json.loads(out.read_text())
+    data = json.loads(out.read_text(encoding="utf-8"))
     assert data["suite"] == "support-bot" and len(data["results"]) == 6
-    assert "<!doctype html>" in page.read_text() and "## ✅ EvalSentry" in md.read_text()
-    assert summary.read_text() == md.read_text() + "\n"
+    assert "<!doctype html>" in page.read_text(encoding="utf-8") and "## ✅ EvalSentry" in md.read_text(encoding="utf-8")
+    assert summary.read_text(encoding="utf-8") == md.read_text(encoding="utf-8") + "\n"
 
 
 def test_prompt_regression_fails_the_gate(tmp_path):

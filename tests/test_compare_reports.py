@@ -64,7 +64,7 @@ def test_save_load_round_trip(tmp_path):
     run.save(p)
     back = RunResult.load(p)
     assert back.results == run.results and back.pass_rate == run.pass_rate
-    data = json.loads(p.read_text())
+    data = json.loads(p.read_text(encoding="utf-8"))
     data["version"] = 99
     p.write_text(json.dumps(data))
     with pytest.raises(ValueError):
