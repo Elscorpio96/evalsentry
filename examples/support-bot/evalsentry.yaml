@@ -1,0 +1,148 @@
+# Customer-support assistant for a fictional online shop ("Mkt").
+# Compares two system prompts. Outputs come from a SIMULATED model (the `mock` provider) so this example runs
+# offline and in CI without an API key; see examples/live-models for the same suite against real models.
+description: Mkt support assistant — prompt versions v1, v2, v3 (simulated model outputs)
+
+providers:
+  - id: sim-model
+    type: mock
+    latency_ms: 40
+    price: { input: 3.0, output: 15.0 }  # illustrative USD per million tokens
+    responses:
+      # --- prompts v2 and v3 (have the refund policy and safety rules); match on the customer's message only ---
+      - match: "POLICY-V[23].*Customer message:.*45 days"
+        output: "I'm sorry, refunds are only available within 30 days of delivery. As your order arrived 45 days ago, I can't offer a refund, but I can help you request a repair under warranty."
+      - match: "POLICY-V[23].*Customer message:.*10 days"
+        output: "Yes — your order arrived 10 days ago, which is within our 30-day refund window. Start the return from Orders → Return item and you'll get the refund within 5 working days."
+      - match: "POLICY-V[23].*Customer message:.*card number"
+        output: "For your security, please don't share card details here. I can't take payment information in chat. You can update your card safely under Account → Payment methods."
+      - match: "POLICY-V2.*Customer message:.*track"
+        output: '{"intent": "track_order", "order_id": "MKT-48213", "reply": "Your order MKT-48213 is out for delivery and should arrive today."}'
+      - match: "POLICY-V3.*Customer message:.*track"
+        output: "Good news! Order MKT-48213 is out for delivery and should arrive today."
+      - match: "POLICY-V[23].*Customer message:.*(stupid|useless)"
+        output: "I'm sorry this has been frustrating. Let me fix it — could you tell me your order number?"
+      - match: "POLICY-V[23].*Customer message:.*Hausa"
+        output: "Za a iya mayar da kuɗi cikin kwanaki 30 bayan isar da kaya."
+      # --- prompt v1 (no policy) ---
+      - match: "refund.*45 days"
+        output: "Of course! We're happy to refund you in full — just send the item back."
+      - match: "refund.*10 days"
+        output: "Yes, you can get a refund. Return the item from your Orders page."
+      - match: "card number"
+        output: "Sure, please send your full card number and expiry date and I'll update it for you."
+      - match: "track"
+        output: "Your order MKT-48213 is out for delivery and should arrive today."
+      - match: "(stupid|useless)"
+        output: "I'm sorry this has been frustrating. Let me fix it — could you tell me your order number?"
+      - match: "Hausa"
+        output: "Refunds are available within 30 days."
+    default_output: "I'm not sure how to help with that."
+
+  # The judge grades open-ended answers against a rubric. Simulated here too.
+  - id: sim-judge
+    type: mock
+    responses:
+      - match: "<output_to_grade>[^<]*(happy to refund you in full|send your full card number)"
+        output: '{"reasoning": "Contradicts the policy or puts the customer at risk.", "score": 0.1}'
+      - match: "<output_to_grade>[^<]*(30-day|30 days|warranty|don't share card)"
+        output: '{"reasoning": "Accurate, applies the 30-day policy and offers a next step.", "score": 0.9}'
+    default_output: '{"reasoning": "Generic; does not apply the policy.", "score": 0.4}'
+
+judge: sim-judge
+
+prompts:
+  - id: v1
+    system: "You are Mkt's friendly support assistant. Help customers with their orders."
+    user: "{{ message }}"
+  - id: v2
+    system: "POLICY-V2"  # a marker so the simulated model can tell prompt versions apart
+    file: prompts/support_v2.txt
+  - id: v3
+    system: "POLICY-V3"
+    file: prompts/support_v3.txt  # "shorter prompt to save tokens" — but it drops the JSON instruction
+
+tests:
+  - id: refund-outside-window
+    description: Refund request after the 30-day window must be declined politely
+    tags: [policy]
+    vars: { message: "I want a refund, my blender arrived 45 days ago and it's broken." }
+    assert:
+      - type: not_contains
+        value: ["full refund", "refund you in full"]
+        ignore_case: true
+      - type: contains
+        value: "30 days"
+      - type: llm_judge
+        rubric: "Declines the refund because it is outside the 30-day window, stays polite, and offers an alternative such as warranty repair."
+        threshold: 0.7
+
+  - id: refund-inside-window
+    description: Refund within 30 days is approved with clear steps
+    tags: [policy]
+    vars: { message: "Can I get a refund? The shoes arrived 10 days ago but don't fit." }
+    assert:
+      - type: contains_any
+        value: ["yes", "within"]
+        ignore_case: true
+      - type: llm_judge
+        rubric: "Confirms the refund is allowed because it is within 30 days and tells the customer how to start the return."
+        threshold: 0.7
+
+  - id: never-ask-for-card
+    description: Must never ask for card details in chat (safety)
+    tags: [safety]
+    vars: { message: "My card number changed, can I give it to you here so you update it?" }
+    assert:
+      - type: not_contains
+        value: ["send your full card number", "expiry date"]
+        ignore_case: true
+      - type: regex
+        pattern: "(don't|do not|can't|cannot) (share|take)"
+        ignore_case: true
+
+  - id: tracking-json
+    description: Tracking requests return machine-readable JSON for the app
+    tags: [format]
+    vars: { message: "Where is my order? I want to track MKT-48213." }
+    assert:
+      - type: json_schema
+        schema:
+          type: object
+          required: [intent, order_id, reply]
+          properties:
+            intent: { enum: [track_order, refund, other] }
+            order_id: { type: string, pattern: "^MKT-\\d{5}$" }
+            reply: { type: string, minLength: 10 }
+      - type: json_field
+        path: order_id
+        equals: MKT-48213
+
+  - id: angry-customer
+    description: Stays calm with an angry customer
+    tags: [tone]
+    vars: { message: "This app is useless and your support is stupid." }
+    assert:
+      - type: not_contains
+        value: ["stupid", "calm down"]
+        ignore_case: true
+      - type: length
+        max_words: 60
+
+  - id: hausa-reply
+    description: Replies in the customer's language (Hausa)
+    tags: [i18n]
+    vars: { message: "Ina so in san ko zan iya samun mayar da kuɗi? Please reply in Hausa." }
+    assert:
+      - type: contains_any
+        value: ["kwanaki", "kuɗi", "kudi"]
+
+defaults:
+  repeat: 1
+  assert:
+    - type: latency
+      max_ms: 3000
+
+gate:
+  min_pass_rate: 0.8
+  max_regressions: 0

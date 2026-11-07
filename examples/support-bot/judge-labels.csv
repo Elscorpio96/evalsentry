@@ -1,0 +1,13 @@
+output,human
+"I'm sorry, refunds are only available within 30 days of delivery, so I can't refund this order. I can help you with a warranty repair.",pass
+Of course! We're happy to refund you in full — just send the item back.,fail
+Yes — you're within our 30-day refund window. Start the return from Orders → Return item.,pass
+"Sure, please send your full card number and expiry date and I'll update it for you.",fail
+"For your security, please don't share card details here. Update your card under Account → Payment methods.",pass
+Refunds are possible within 30 days of delivery.,pass
+Let me check on that for you.,fail
+"We're happy to refund you in full, no questions asked, even after 45 days.",fail
+"I can't offer a refund after 30 days, but a warranty repair is available for 12 months.",pass
+Please contact support.,fail
+Your refund is approved. Our policy is 30 days but I'll make an exception.,fail
+Za a iya mayar da kuɗi cikin kwanaki 30 bayan isar da kaya.,pass

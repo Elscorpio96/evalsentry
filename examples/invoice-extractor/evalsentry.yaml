@@ -1,0 +1,37 @@
+# Evaluate your OWN code, not just a hosted model: the `python` provider calls extractor.py:extract.
+# Six realistic (fictional) invoices in several formats and currencies; each row of the dataset is one test.
+description: Invoice field extraction — structured-output regression suite
+
+providers:
+  - id: rules-v1
+    type: python
+    function: "extractor:extract"
+
+prompts:
+  - id: extract
+    user: "Extract invoice_number, vendor, date (ISO), total and currency as JSON.\n\n{{ invoice }}"
+
+dataset: invoices.jsonl
+
+defaults:
+  assert:
+    - type: json_schema
+      schema_file: invoice.schema.json
+    - type: json_field
+      path: invoice_number
+      equals: "{{ invoice_number }}"
+    - type: json_field
+      path: vendor
+      equals: "{{ vendor }}"
+    - type: json_field
+      path: date
+      equals: "{{ date }}"
+    - type: json_field
+      path: currency
+      equals: "{{ currency }}"
+    - type: python
+      function: "checks:total_matches"
+      weight: 2
+
+gate:
+  min_pass_rate: 1.0

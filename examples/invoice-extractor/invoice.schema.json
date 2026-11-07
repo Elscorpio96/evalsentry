@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["invoice_number", "vendor", "date", "total", "currency"],
+  "properties": {
+    "invoice_number": {"type": "string", "minLength": 3},
+    "vendor": {"type": "string", "minLength": 2},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "total": {"type": "number", "exclusiveMinimum": 0},
+    "currency": {"enum": ["NGN", "USD", "GBP", "EUR", "GHS", "KES"]}
+  },
+  "additionalProperties": false
+}
