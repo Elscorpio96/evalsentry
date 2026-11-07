@@ -1,0 +1,81 @@
+name: EvalSentry
+description: Run an LLM evaluation suite, post the results to the job summary and fail the build when the quality gate fails.
+author: Walid Bello Yakubu
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  config:
+    description: Path to the suite file.
+    default: evalsentry.yaml
+  baseline:
+    description: Results JSON from a previous run (for example committed at evals/baseline.json). Enables the max_regressions gate.
+    default: ""
+  args:
+    description: Extra arguments for `evalsentry run`, e.g. "--prompt v2 --tag smoke".
+    default: ""
+  python-version:
+    description: Python version to run EvalSentry with.
+    default: "3.12"
+  report-name:
+    description: Name of the uploaded artifact with the HTML report and results JSON.
+    default: evalsentry-report
+  fail-on-gate:
+    description: Fail the step when the quality gate fails.
+    default: "true"
+
+outputs:
+  exit-code:
+    description: 0 gate passed, 1 gate failed, 2 configuration or usage error.
+    value: ${{ steps.run.outputs.exit-code }}
+  results:
+    description: Path to the results JSON.
+    value: ${{ steps.run.outputs.results }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install EvalSentry
+      shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Run evaluation suite
+      id: run
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        BASELINE: ${{ inputs.baseline }}
+        EXTRA_ARGS: ${{ inputs.args }}
+      run: |
+        out="${RUNNER_TEMP}/evalsentry"
+        mkdir -p "$out"
+        set +e
+        baseline_args=()
+        if [ -n "$BASELINE" ]; then baseline_args=(--baseline "$BASELINE"); fi
+        # shellcheck disable=SC2086 # EXTRA_ARGS is intentionally word-split
+        evalsentry run -c "$CONFIG" --github --html "$out/report.html" -o "$out/results.json" "${baseline_args[@]}" $EXTRA_ARGS
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "results=$out/results.json" >> "$GITHUB_OUTPUT"
+        echo "dir=$out" >> "$GITHUB_OUTPUT"
+
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ steps.run.outputs.dir }}
+        if-no-files-found: ignore
+
+    - name: Apply quality gate
+      if: inputs.fail-on-gate == 'true' && steps.run.outputs.exit-code != '0'
+      shell: bash
+      run: |
+        echo "::error title=EvalSentry::Quality gate failed (exit code ${{ steps.run.outputs.exit-code }}). See the job summary and the report artifact."
+        exit 1

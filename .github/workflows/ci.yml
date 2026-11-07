@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: mypy evalsentry
+      - run: pytest -q
+
+  action:
+    name: Dogfood the GitHub Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Baseline — prompt v2 (should pass)
+        id: v2
+        uses: ./
+        with:
+          config: examples/support-bot/evalsentry.yaml
+          args: --prompt v2 --no-cache
+          report-name: report-v2
+
+      - name: Candidate — prompt v3 against the v2 baseline (should be blocked)
+        id: v3
+        uses: ./
+        with:
+          config: examples/support-bot/evalsentry.yaml
+          baseline: ${{ steps.v2.outputs.results }}
+          args: --prompt v3 --no-cache
+          report-name: report-v3
+          fail-on-gate: "false"
+
+      - name: The regression must have been caught
+        run: test "${{ steps.v3.outputs.exit-code }}" = "1"
+
+      - name: Python provider example
+        uses: ./
+        with:
+          config: examples/invoice-extractor/evalsentry.yaml
+          report-name: report-invoices
